@@ -892,13 +892,14 @@ const seedDatabase = async () => {
     // Only the placement-officer account is created, with no invented activity.
     if (!(await User.findOne({ email: 'admin@prep.ai' }))) {
       const salt = await bcrypt.genSalt(10);
+      const initialPassword = process.env.ADMIN_PASSWORD || '20062006';
       await User.create({
         email: 'admin@prep.ai',
-        passwordHash: await bcrypt.hash('admin123', salt),
+        passwordHash: await bcrypt.hash(initialPassword, salt),
         fullName: 'Placement Officer',
         role: 'admin'
       });
-      console.log('[Seed] Admin account created. Change its password before sharing the app.');
+      console.log(`[Seed] Admin account created (admin@prep.ai).`);
     }
 
     // Question bank: add any seed question that is missing, keep everything already there

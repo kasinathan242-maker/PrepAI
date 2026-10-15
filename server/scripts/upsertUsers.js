@@ -5,8 +5,26 @@ dotenv.config();
 
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/prepai').then(async () => {
   const salt = await bcrypt.genSalt(10);
+  const prepaiAdminHash = await bcrypt.hash('20062006', salt);
   const adminHash = await bcrypt.hash('Admin@2026', salt);
   const studentHash = await bcrypt.hash('Student@2026', salt);
+
+  await mongoose.connection.db.collection('users').updateOne(
+    { email: 'admin@prep.ai' },
+    {
+      $set: {
+        email: 'admin@prep.ai',
+        passwordHash: prepaiAdminHash,
+        fullName: 'Placement Officer',
+        collegeName: 'National Institute of Technology',
+        role: 'admin',
+        isActive: true,
+        createdAt: new Date(),
+        lastActive: new Date()
+      }
+    },
+    { upsert: true }
+  );
 
   await mongoose.connection.db.collection('users').updateOne(
     { email: 'admin@college.edu' },
