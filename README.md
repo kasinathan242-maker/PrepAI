@@ -104,18 +104,9 @@ Mini project/
 │   │   └── tests/                # Native Node.js unit & integration tests
 │   │       └── prepai.test.js
 │   └── package.json
-├── services/
-│   └── laya-engine/              # Non-autoregressive decision model microservice
-│       ├── app.py                # FastAPI HTTP service (:7860)
-│       ├── evaluator.py          # Laya question definitions & inference orchestration
-│       ├── model.py              # Singleton model loader (convaiinnovations/laya)
-│       ├── schemas.py            # Pydantic typed request & response models
-│       ├── health.py             # Health check & resource telemetry endpoint
-│       ├── requirements.txt      # Python dependencies
-│       └── tests/
-│           └── test_laya_engine.py # Laya model test suite
-├── package.json                  # Root monorepo workspace scripts
-└── [DOCUMENTATION FILES]          # Comprehensive architectural & operational guides
+├── scripts/                      # Orchestration & test scripts
+├── package.json                  # Workspace management scripts
+└── README.md                     # Project documentation
 ```
 
 ---

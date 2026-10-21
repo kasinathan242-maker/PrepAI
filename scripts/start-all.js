@@ -141,7 +141,7 @@ process.on('SIGTERM', () => { stopAll(); process.exit(0); });
     results.models = true;
   }
 
-  if (LAYA_ENABLED) {
+  if (LAYA_ENABLED && fs.existsSync(path.join(ROOT, 'services', 'laya-engine'))) {
     results.laya = await ensure('laya', `${LAYA}/health`, () => start('laya', isWin ? 'py' : 'python3', ['app.py'], path.join(ROOT, 'services', 'laya-engine')), 180);
   } else {
     results.laya = true;
@@ -150,13 +150,13 @@ process.on('SIGTERM', () => { stopAll(); process.exit(0); });
   results.api = await ensure('api', `${API}/api/v1/health`, () => start('api', 'node', ['--watch', 'src/server.js'], path.join(ROOT, 'server')), 60);
   results.web = await ensure('web', WEB, () => start('web', 'npx', ['vite', '--port', '5174', '--strictPort'], path.join(ROOT, 'frontend')), 60);
 
-  const aiName = PROVIDER === 'ollama' ? 'AI models (Ollama)' : 'Custom AI Models (Hugging Face)';
+  const aiName = PROVIDER === 'ollama' ? 'AI models (Ollama)' : 'Custom AI Models';
   const aiUrl = PROVIDER === 'ollama' ? OLLAMA : CUSTOM_URL;
 
   const rows = [
     [aiName, results.ai && results.models, aiUrl]
   ];
-  if (LAYA_ENABLED) {
+  if (LAYA_ENABLED && fs.existsSync(path.join(ROOT, 'services', 'laya-engine'))) {
     rows.push(['Laya decision service', results.laya, LAYA]);
   }
   rows.push(['API', results.api, API]);
