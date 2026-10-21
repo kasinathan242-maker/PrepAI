@@ -13,8 +13,6 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: MONGODB_URI
-        sync: false
       - key: AI_PROVIDER
         value: custom
       - key: CUSTOM_MODEL_URL
