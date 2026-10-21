@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: prepai
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: AI_PROVIDER
+        value: custom
+      - key: CUSTOM_MODEL_URL
+        value: https://api.groq.com/openai/v1
+      - key: CUSTOM_API_KEY
+        sync: false
+      - key: CUSTOM_MODEL
+        value: qwen/qwen3.8-27b
+      - key: CUSTOM_EVALUATION_MODEL
+        value: qwen/qwen3.8-27b
+      - key: CUSTOM_VISION_MODEL
+        value: qwen/qwen3.8-27b
+      - key: CUSTOM_EMBEDDING_MODEL
+        value: BAAI/bge-small-en-v1.5
+      - key: LAYA_ENABLED
+        value: "false"

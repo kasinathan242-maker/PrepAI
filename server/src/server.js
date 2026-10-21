@@ -61,7 +61,11 @@ connectDB().then(async () => {
 // Only the configured desktop web origins may call the API from a browser (spec §24)
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || appConfig.corsOrigins.includes(origin)) return cb(null, true);
+    if (!origin || appConfig.corsOrigins.includes(origin) || appConfig.corsOrigins.includes('*')) return cb(null, true);
+    try {
+      const hostname = new URL(origin).hostname;
+      if (hostname.endsWith('.onrender.com') || hostname === 'localhost' || hostname === '127.0.0.1') return cb(null, true);
+    } catch { /* ignore invalid url */ }
     return cb(null, false);
   },
   credentials: true,
@@ -114,16 +118,27 @@ app.use('/api/v1/aptitude/sessions', require('./routes/aptitude'));
 // Direct aliases for roles, companies, and skill-gap
 app.use('/api/v1', require('./routes/intelligence'));
 
-// Fallback Root Route
-app.get('/', (req, res) => {
-  res.json({
-    name: 'PrepAI API Server',
-    stack: 'MERN (MongoDB, Express, React, Node.js)',
-    version: '1.0.0',
-    status: 'online',
-    docs: '/api/v1/health'
+// Serve frontend build if dist exists, or fallback API JSON
+const fs = require('fs');
+const distPath = path.resolve(__dirname, '../../frontend/dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
   });
-});
+} else {
+  // Fallback Root Route
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'PrepAI API Server',
+      stack: 'MERN (MongoDB, Express, React, Node.js)',
+      version: '1.0.0',
+      status: 'online',
+      docs: '/api/v1/health'
+    });
+  });
+}
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -145,12 +160,11 @@ process.on('unhandledRejection', err => {
   console.error('[unhandledRejection]', err && err.stack ? err.stack : err);
 });
 
-const PORT = appConfig.port;
-app.listen(PORT, '127.0.0.1', () => {
+const PORT = process.env.PORT || appConfig.port;
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
   console.log(`=======================================================`);
-  console.log(`  🚀 PrepAI MERN Express Server is Live on:`);
-  console.log(`  👉 http://127.0.0.1:${PORT}`);
-  console.log(`  👉 Database: MongoDB (mongodb://127.0.0.1:27017/prepai)`);
+  console.log(`  🚀 PrepAI Server is Live on: http://${HOST}:${PORT}`);
   console.log(`=======================================================`);
 });
 

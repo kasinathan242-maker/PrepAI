@@ -19,8 +19,9 @@
     "frontend": "npm --prefix frontend run dev",
     "test:integration": "npm --prefix server run test:integration",
     "migrate": "npm --prefix server run migrate",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix server install",
+    "start": "node server/src/server.js",
     "start:all": "node scripts/start-all.js",
-    "start": "node scripts/start-all.js",
     "dev:web": "npm --prefix frontend run dev"
   }
 }
