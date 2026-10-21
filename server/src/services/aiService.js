@@ -38,7 +38,10 @@ function scrubPII(text) {
     .replace(/https?:\/\/(www\.)?linkedin\.com\/[^\s)]+/gi, '[LINKEDIN]');
 }
 
-// Backwards-compatible name used by older call sites
-const callOllamaLLM = (system, user, opts = {}) => generateText(system, user, { feature: opts.feature || 'generic_generation', maxTokens: opts.maxTokens, temperature: opts.temperature });
+// Primary custom model generation helpers
+const callCustomLLM = (system, user, opts = {}) => generateText(system, user, { feature: opts.feature || 'generic_generation', maxTokens: opts.maxTokens, temperature: opts.temperature });
+const callAIModel = callCustomLLM;
+// Backwards-compatible name used by legacy call sites
+const callOllamaLLM = callCustomLLM;
 
-module.exports = { generateText, callOllamaLLM, scrubPII };
+module.exports = { generateText, callCustomLLM, callAIModel, callOllamaLLM, scrubPII };

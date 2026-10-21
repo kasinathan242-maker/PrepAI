@@ -2,6 +2,8 @@
  * Central configuration. Every provider, model id, TTL and service URL is read here so
  * business logic never hardcodes a model name (spec §7.3, §31).
  */
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 require('dotenv').config();
 
 const num = (v, d) => {
@@ -33,27 +35,29 @@ const config = {
   },
 
   ai: {
-    provider: (process.env.AI_PROVIDER || 'ollama').toLowerCase(),
-    model: process.env.AI_MODEL || 'qwen3:8b',
-    // Optional separate model for background grading (evaluation, reference packs, report prose).
-    // Defaults to AI_MODEL; lets a slower, more accurate model grade while dialogue stays fast.
-    evaluationModel: process.env.EVALUATION_MODEL || process.env.AI_MODEL || 'qwen3:8b',
-    // Local vision model for the camera tutor (frame analysis after the interview)
-    visionModel: process.env.VISION_MODEL || 'qwen2.5vl:3b',
-    fallbackProvider: process.env.AI_FALLBACK_PROVIDER ? process.env.AI_FALLBACK_PROVIDER.toLowerCase() : null,
+    // Strictly Custom & Open-Source Hugging Face Models
+    provider: (process.env.AI_PROVIDER || 'custom').toLowerCase(),
+    model: process.env.CUSTOM_MODEL || process.env.AI_MODEL || 'Qwen/Qwen2.5-Coder-7B-Instruct',
+    evaluationModel: process.env.CUSTOM_EVALUATION_MODEL || process.env.EVALUATION_MODEL || process.env.CUSTOM_MODEL || 'Qwen/Qwen2.5-Coder-7B-Instruct',
+    visionModel: process.env.CUSTOM_VISION_MODEL || process.env.VISION_MODEL || 'Qwen/Qwen2.5-VL-7B-Instruct',
+    fallbackProvider: null, // Strictly custom models only (no proprietary cloud providers)
     timeoutMs: num(process.env.AI_TIMEOUT_MS, 90000),
-    ollamaBaseUrl: (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, ''),    anthropicModel: process.env.ANTHROPIC_MODEL || null,
-    geminiModel: process.env.GEMINI_MODEL || null,
-    openaiModel: process.env.OPENAI_MODEL || null
+    customBaseUrl: (process.env.CUSTOM_MODEL_URL || process.env.CUSTOM_BASE_URL || process.env.HF_BASE_URL || 'https://router.huggingface.co/hf-inference/v1').replace(/\/$/, ''),
+    customApiKey: process.env.CUSTOM_API_KEY || process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || '',
+    customModel: process.env.CUSTOM_MODEL || process.env.AI_MODEL || 'Qwen/Qwen2.5-Coder-7B-Instruct',
+    customVisionModel: process.env.CUSTOM_VISION_MODEL || process.env.VISION_MODEL || 'Qwen/Qwen2.5-VL-7B-Instruct',
+    customVisionUrl: (process.env.CUSTOM_VISION_URL || process.env.CUSTOM_MODEL_URL || process.env.CUSTOM_BASE_URL || process.env.HF_BASE_URL || 'https://router.huggingface.co/hf-inference/v1').replace(/\/$/, ''),
+    ollamaBaseUrl: (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '')
   },
 
   embeddings: {
-    provider: (process.env.EMBEDDING_PROVIDER || 'ollama').toLowerCase(),
-    model: process.env.EMBEDDING_MODEL || process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text'
+    provider: 'custom',
+    model: process.env.CUSTOM_EMBEDDING_MODEL || process.env.EMBEDDING_MODEL || 'BAAI/bge-small-en-v1.5',
+    customBaseUrl: (process.env.CUSTOM_EMBEDDING_URL || process.env.CUSTOM_MODEL_URL || process.env.CUSTOM_BASE_URL || process.env.HF_BASE_URL || 'https://router.huggingface.co/hf-inference/v1').replace(/\/$/, '')
   },
 
   laya: {
-    enabled: bool(process.env.LAYA_ENABLED, true),
+    enabled: bool(process.env.LAYA_ENABLED, false), // Disabled by default for pure cloud custom models (no local daemons)
     model: process.env.LAYA_MODEL || 'convaiinnovations/laya',
     serviceUrl: (process.env.LAYA_SERVICE_URL || 'http://127.0.0.1:7860').replace(/\/$/, ''),
     // Laya runs on CPU here (~4 s per decision batch); keep the budget realistic

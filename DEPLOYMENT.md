@@ -72,16 +72,15 @@ services:
     environment:
       PORT: 7857
       MONGO_URI: mongodb://mongodb:27017/prepai
-      AI_PROVIDER: ollama
-      OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: qwen2.5-coder:7b
-      OLLAMA_EMBED_MODEL: nomic-embed-text
+      AI_PROVIDER: custom
+      CUSTOM_MODEL_URL: http://custom-models:8000/v1 # Or your live cloud custom model URL
+      CUSTOM_MODEL: custom-model
+      CUSTOM_EMBEDDING_MODEL: custom-embedding-model
       JWT_SECRET: production_entropy_jwt_secret_prepai_2026
     ports:
       - "7857:7857"
     depends_on:
       - mongodb
-      - ollama
 
   prepai-frontend:
     build:

@@ -2,7 +2,7 @@
 
 ## 1. Overview of Supported Providers
 
-PrepAI's Provider Abstraction Layer enables seamless switching between 100% private on-premise local inference and major commercial cloud AI providers without altering core business logic.
+PrepAI's Provider Abstraction Layer decouples application logic from inference backends, allowing full customization across live cloud hosting, private servers, and custom model endpoints.
 
 ```
                       ┌─────────────────────────────────┐
@@ -12,128 +12,95 @@ PrepAI's Provider Abstraction Layer enables seamless switching between 100% priv
         ┌──────────────┬───────────────┴───────────────┬──────────────┐
         ▼              ▼                               ▼              ▼
 ┌──────────────┐ ┌──────────────┐             ┌────────────────┐ ┌──────────────┐
-│ Local Ollama │ │Anthropic API │             │ Google Gemini  │ │OpenAI / Groq │
-│ (Default)    │ │(Claude 3.5)  │             │(Flash / Pro)   │ │(vLLM / LM)   │
+│ Custom Models│ │Anthropic API │             │ Google Gemini  │ │OpenAI / Groq │
+│ (Live Default│ │(Claude 3.5)  │             │(Flash / Pro)   │ │(vLLM / LM)   │
 └──────────────┘ └──────────────┘             └────────────────┘ └──────────────┘
 ```
 
 ---
 
-## 2. Local Ollama Provider (Primary Default)
+## 2. Custom Models Provider (Option A: 100% Hugging Face Open-Source Architecture)
 
-Ollama provides private, zero-cost, local inference running entirely within your workstation or dedicated server.
+PrepAI is configured to run entirely on **Custom Open-Source Models** (`AI_PROVIDER=custom`) hosted remotely via Hugging Face Serverless Inference Router, eliminating all desktop and local daemon dependencies (no local Ollama, no local PyTorch, no local vLLM).
 
-### 2.1. Prerequisites & Installation
-1. Install Ollama for Windows, Linux, or macOS from [ollama.com](https://ollama.com).
-2. Verify daemon is listening:
-   ```bash
-   curl http://127.0.0.1:11434/api/tags
-   ```
+### 2.1. Selected Custom Models by Task
+- **Live Interview Turn**: `Qwen/Qwen2.5-Coder-7B-Instruct` (Fast, high-fidelity technical dialogue)
+- **7-Dimension Rubric Grading**: `Qwen/Qwen2.5-Coder-7B-Instruct` (Precise JSON structured outputs and candidate evaluation)
+- **Camera Proctoring & Vision Tutor**: `Qwen/Qwen2.5-VL-7B-Instruct` (Webcam frame inspection, posture & environment analysis)
+- **Semantic Embeddings & RAG**: `BAAI/bge-small-en-v1.5` (768-dim dense vector embeddings)
 
-### 2.2. Recommended Model Suite
-PrepAI utilizes three distinct models for optimal performance and latency:
+### 2.2. Environment Configuration
+Add or update these keys in your `server/.env`:
 
-```bash
-# 1. Primary Reasoning & Technical Evaluation (Mandatory)
-ollama pull qwen2.5-coder:7b
+```env
+AI_PROVIDER=custom
+CUSTOM_MODEL_URL=https://router.huggingface.co/hf-inference/v1
+CUSTOM_API_KEY=your_huggingface_token_here          # or set HF_TOKEN=
+HF_TOKEN=your_huggingface_token_here
 
-# 2. Dense Vector Embeddings (Mandatory)
-ollama pull nomic-embed-text
+# Specific task models:
+CUSTOM_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+CUSTOM_EVALUATION_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+CUSTOM_VISION_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+CUSTOM_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 
-# 3. Fast Conversational Turns / Voice Follow-ups (Optional, Recommended for Low-End CPUs)
-ollama pull llama3.2:latest
+# Laya Service (disabled: no local services required)
+LAYA_ENABLED=false
 ```
 
-### 2.3. Minimum & Recommended Hardware Specifications
-
-| Component | Minimum Spec (CPU Only) | Recommended Spec (NVIDIA GPU) | Enterprise Spec |
-| :--- | :--- | :--- | :--- |
-| **Processor** | 8-core modern x86_64 / Apple Silicon | Intel i7 / Ryzen 7 / Apple M1 Pro | Intel Xeon / AMD Threadripper |
-| **System RAM**| 16 GB DDR4/DDR5 | 32 GB DDR5 | 64 GB ECC RAM |
-| **GPU / VRAM**| Integrated Graphics (CPU inference) | NVIDIA RTX 3060 (12 GB VRAM) | NVIDIA RTX 4090 (24 GB) or A100 |
-| **Storage** | 20 GB SSD space | 50 GB NVMe PCIe 4.0 | 100 GB Enterprise NVMe |
-| **Eval Speed**| ~8-12 seconds / turn | **~2.5-4.5 seconds / turn** | **~0.8-1.5 seconds / turn** |
+### 2.3. Embeddings & Fallback
+If your custom model backend only serves text/chat completions without an embeddings endpoint, PrepAI automatically activates an internal deterministic 768-dimensional normalized embedding fallback, ensuring that semantic vector comparisons and cosine similarity continue operating without errors.
 
 ---
 
-## 3. Cloud Provider Setup & Configuration
+## 3. Alternative Cloud Providers
 
-To enable cloud fallbacks or run cloud-first, populate the corresponding environment variables in `server/.env`.
+You can switch or configure cloud fallback providers by setting the corresponding environment variables:
 
-### 3.1. Anthropic Claude
-- **Supported Models**: `claude-3-5-haiku-20241022`, `claude-3-7-sonnet-20250219`
-- **Key Configuration**:
-  ```env
-  AI_PROVIDER=anthropic
-  ANTHROPIC_API_KEY=sk-ant-api03-...
-  ANTHROPIC_MODEL=claude-3-5-haiku-20241022
-  ```
-- **Strengths**: Best-in-class nuanced reasoning on complex system design trade-offs.
-
-### 3.2. Google Gemini
-- **Supported Models**: `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.0-flash`
-- **Key Configuration**:
+### 3.1. Google Gemini
+- **Setup**:
   ```env
   AI_PROVIDER=gemini
   GEMINI_API_KEY=AIzaSy...
   GEMINI_MODEL=gemini-1.5-flash
   ```
-- **Strengths**: Highly cost-effective with massive context window handling.
 
-### 3.3. OpenAI & OpenAI-Compatible (Groq, DeepSeek, vLLM, LM Studio)
-- **Supported Endpoints**: Any provider implementing the standard `/v1/chat/completions` protocol.
-- **Key Configuration**:
+### 3.2. Anthropic Claude
+- **Setup**:
+  ```env
+  AI_PROVIDER=anthropic
+  ANTHROPIC_API_KEY=sk-ant-api03-...
+  ANTHROPIC_MODEL=claude-3-5-haiku-20241022
+  ```
+
+### 3.3. OpenAI & Groq
+- **Setup**:
   ```env
   AI_PROVIDER=openai
-  OPENAI_API_KEY=your_api_key_or_dummy
-  OPENAI_BASE_URL=https://api.openai.com/v1   # Or https://api.groq.com/openai/v1 or http://localhost:8000/v1
-  OPENAI_MODEL=gpt-4o-mini
+  OPENAI_API_KEY=gsk_...
+  OPENAI_BASE_URL=https://api.groq.com/openai/v1
+  OPENAI_MODEL=llama-3.3-70b-versatile
   ```
-- **Groq Acceleration**: Set `OPENAI_BASE_URL=https://api.groq.com/openai/v1` and `OPENAI_MODEL=llama-3.3-70b-versatile` for ultra-low latency (< 800ms) turns.
 
 ---
 
-## 4. Environment Variables Reference
+## 4. Legacy Local Ollama (Optional Local Testing Only)
 
-| Variable | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `AI_PROVIDER` | `string` | `ollama` | Active provider: `ollama`, `anthropic`, `gemini`, `openai`. |
-| `OLLAMA_BASE_URL` | `url` | `http://127.0.0.1:11434` | Network location of the local Ollama daemon. |
-| `OLLAMA_MODEL` | `string` | `qwen2.5-coder:7b` | Primary chat completion and evaluation model. |
-| `OLLAMA_EMBED_MODEL`| `string` | `nomic-embed-text` | Embedding model for semantic vector similarity. |
-| `ANTHROPIC_API_KEY`| `string` | `""` | Anthropic console authentication token. |
-| `ANTHROPIC_MODEL` | `string` | `claude-3-5-haiku` | Anthropic model version identifier. |
-| `GEMINI_API_KEY` | `string` | `""` | Google AI Studio authentication API key. |
-| `GEMINI_MODEL` | `string` | `gemini-1.5-flash` | Google Gemini model family identifier. |
-| `OPENAI_API_KEY` | `string` | `""` | OpenAI or third-party proxy secret key. |
-| `OPENAI_BASE_URL` | `url` | `https://api.openai.com/v1` | Base URL for OpenAI-compatible proxies/vLLM. |
-| `OPENAI_MODEL` | `string` | `gpt-4o-mini` | Model parameter passed to completion endpoint. |
+For developers who explicitly wish to run local desktop Ollama on their workstations:
+```env
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5-coder:7b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+```
 
 ---
 
-## 5. Failover Matrix & Fallback Order
+## 5. Live Production Deployment Checklist
 
-PrepAI guarantees continuous session operation via structured fallback resolution:
-
-```
-┌────────────────────────────────┐
-│  Primary: Local Ollama         │
-└───────────────┬────────────────┘
-                │ (Connection Refused / Timeout > 45s)
-                ▼
-┌────────────────────────────────┐
-│  Fallback 1: Claude / Gemini   │ (If API keys present)
-└───────────────┬────────────────┘
-                │ (Cloud Quota Exhausted / Network Offline)
-                ▼
-┌────────────────────────────────┐
-│  Fallback 2: OpenAI Compatible │
-└───────────────┬────────────────┘
-                │ (All Providers Unavailable)
-                ▼
-┌────────────────────────────────┐
-│  Deterministic Safe Engine     │ (Lexical Jaccard + Keyword Cluster Analysis)
-└────────────────────────────────┘
-```
-
-The system continuously attempts to self-heal back to the primary local provider when health pings succeed.
+When deploying PrepAI to cloud platforms (such as Render, Vercel, Railway, or AWS):
+1. **Set `AI_PROVIDER=custom`** (the default).
+2. **Point `CUSTOM_MODEL_URL`** to your deployed inference API or cloud provider gateway.
+3. **Set `JWT_SECRET`** to a secure random string (at least 32 characters).
+4. **Set `MONGODB_URI`** to your MongoDB Atlas connection string.
+5. **Set `CORS_ORIGINS`** to your live frontend URL.

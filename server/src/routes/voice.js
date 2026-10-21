@@ -10,6 +10,7 @@ const {
   sanitizeTextForSpeech,
   resolveVoice
 } = require('../services/ttsService');
+const config = require('../config/env');
 
 const router = express.Router();
 
@@ -123,7 +124,7 @@ router.get('/config', protect, (req, res) => {
     stt: 'browser-native',
     tts: 'edge-neural-tts',
     defaultVoice: 'en-US-ChristopherNeural',
-    llm: 'local-ollama'
+    llm: config.ai.provider === 'custom' ? 'custom-model' : config.ai.provider
   });
 });
 

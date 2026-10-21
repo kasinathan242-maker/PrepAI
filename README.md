@@ -3,13 +3,13 @@
 [![Server tests](https://img.shields.io/badge/Server%20unit%20tests-39%20passing-brightgreen.svg)](#testing--quality-verification)
 [![Integration](https://img.shields.io/badge/API%20integration-14%20passing-brightgreen.svg)](#testing--quality-verification)
 [![Benchmark](https://img.shields.io/badge/Grading%20accuracy-85.8%25%20(120%20cases)-blue.svg)](BENCHMARKS.md)
-[![Local Inference](https://img.shields.io/badge/Local%20Inference-Ollama%20%2B%20Laya-purple.svg)](#model-providers)
+[![Production Live](https://img.shields.io/badge/Live%20Ready-Custom%20Models%20%2B%20Laya-purple.svg)](#model-providers)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-PrepAI is a privacy-first technical interview and placement preparation platform for engineering students. It runs **locally by default** with four AI layers:
-1. **Generative layer**: Qwen via local Ollama. `qwen2.5-coder:7b` drives the live interviewer; `qwen3:8b` grades answers, builds reference packs and writes report prose (both configurable).
+PrepAI is a privacy-first technical interview and placement preparation platform for engineering students. It runs with **Custom Models by default** for instant live cloud/VPS publishing, supported by four AI layers:
+1. **Generative layer**: Custom Models (`CustomModelProvider`) or any OpenAI-compatible live endpoint (vLLM, Groq, LM Studio, custom endpoints). Configurable for live dialogue and analytical grading.
 2. **Decision layer**: `convaiinnovations/laya` in a Python microservice (:7860) returns typed decisions with class probabilities (answer state, relevance, completeness, unsupported claims, follow-up need, response state).
-3. **Embedding layer**: local `nomic-embed-text` via Ollama for semantic similarity to reference answers.
+3. **Embedding layer**: Custom embeddings or automated 768-dimensional normalized deterministic fallback for semantic similarity to reference answers.
 4. **Deterministic layer**: a 7-dimension weighted rubric ($\sum W_i = 1.0$), evidence verification, a conflict policy, a 10-state interview state machine and per-topic mastery with deterministic difficulty rules.
 
 No score is ever invented: if the grading model is unavailable an answer is marked *evaluation failed* and can be retried, instead of receiving a fallback number.
@@ -18,8 +18,8 @@ No score is ever invented: if the grading model is unavailable an answer is mark
 
 ## Key System Highlights
 
-- **Local-first privacy**: inference runs on local Ollama models and the local Laya service; resumes, answers and audio stay on your machine. PII (emails, phone numbers, LinkedIn URLs) is scrubbed before any prompt.
-- **Provider abstraction**: swappable generation providers (Ollama, Anthropic, Gemini, any OpenAI-compatible endpoint) with retries, an explicitly configured fallback provider and per-call observability (`model_executions`: latency, retries, fallback, structured-output validity).
+- **Custom models & live cloud deployment**: runs on your own custom model server (vLLM, LM Studio, Groq, or custom endpoints) without requiring local desktop software like Ollama. PII (emails, phone numbers, LinkedIn URLs) is scrubbed before any prompt.
+- **Provider abstraction**: swappable generation providers (Custom, OpenAI-compatible, Anthropic, Gemini, or Ollama) with retries, an explicitly configured fallback provider and per-call observability (`model_executions`: latency, retries, fallback, structured-output validity).
 - **Multi-signal evaluation (eval-v4)**: LLM rubric evaluation + Laya decisions, with embedding similarity recorded as supporting evidence. Evidence quotes must appear verbatim in the student's answer; concepts claimed without evidence become *UNVERIFIED*; disagreements between signals are recorded and resolved by evidence or flagged *review required*.
 - **7-dimension rubric**: Correctness 25 %, Relevance 15 %, Technical Depth 15 %, Completeness 15 %, Reasoning 10 %, Clarity 10 %, Communication 10 %, aggregated deterministically in code. Caps can only lower a score (e.g. an INCORRECT answer cannot score above 40 on correctness).
 - **10-state interviewer**: Introduction → Background → Resume → Technical Basics → Technical Depth → Problem Solving → Scenario → Behavioral/HR → Final → Feedback, with counter-question strategies (clarification, correction, depth, challenge) chosen in code from Laya signals, duplicate-question suppression and prompt-markup sanitising.
@@ -52,15 +52,12 @@ flowchart TD
     end
 
     subgraph Decision AI Layer
-        EE <--> LayaMicro[Laya Decision Microservice :7860\nconvaiinnovations/laya]
+        EE <--> LayaMicro[Custom AI Evaluation & Classifier Engine\nPure Cloud Open-Source Models]
     end
 
     subgraph AI Provider Abstraction
         EE <--> Factory[AI Provider Factory]
-        Factory -->|Priority 1: Local| Ollama[Ollama Local Daemon :11434\nqwen3:8b / qwen2.5-coder / nomic-embed]
-        Factory -.->|Fallback 1| Anthropic[Anthropic Claude API]
-        Factory -.->|Fallback 2| Gemini[Google Gemini API]
-        Factory -.->|Fallback 3| OpenAI[OpenAI Compatible / Groq / vLLM]
+        Factory -->|Strict Default: Option A| Custom[Custom Model Provider\nRemote Hugging Face Serverless Router\nQwen2.5-Coder / Qwen2.5-VL / BAAI BGE]
     end
 
     subgraph Persistence Layer
@@ -127,31 +124,36 @@ Mini project/
 
 ### 1. Prerequisites
 - **Node.js** 20+ (developed on Node 26)
-- **Python** 3.10+ (64-bit) with PyTorch for the Laya service
-- **MongoDB** 6+ running locally (default `mongodb://127.0.0.1:27017/prepai`)
-- **Ollama** from [ollama.com](https://ollama.com)
-- A GPU is optional but strongly recommended; the reference machine has an RTX 3050 6 GB.
+- **MongoDB** 6+ running locally or MongoDB Atlas in the cloud
+- **Hugging Face Account / Token**: From [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (Free tier supported)
 
-### 2. Pull the Ollama models
-```bash
-ollama pull qwen2.5-coder:7b   # live interviewer (AI_MODEL)
-ollama pull qwen3:8b           # answer grading (EVALUATION_MODEL)
-ollama pull nomic-embed-text   # embeddings
+### 2. Configure Custom Models (Option A: 100% Hugging Face, No Locals)
+Set your custom model parameters in `server/.env`:
+```env
+AI_PROVIDER=custom
+CUSTOM_MODEL_URL=https://router.huggingface.co/hf-inference/v1
+CUSTOM_API_KEY=your_huggingface_token_here          # or set HF_TOKEN=
+HF_TOKEN=your_huggingface_token_here
+
+# Specific open-source models for each interview task:
+CUSTOM_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+CUSTOM_EVALUATION_MODEL=Qwen/Qwen2.5-Coder-7B-Instruct
+CUSTOM_VISION_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+CUSTOM_EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+
+# No local microservices required:
+LAYA_ENABLED=false
 ```
-With less than ~10 GB of VRAM, use one of the two Qwen models for both settings, or keep them
-split: grading then waits until an interview ends so the dialogue model is never swapped out
-mid-interview (see [BENCHMARKS.md](BENCHMARKS.md#5-configuration-chosen)).
 
 ### 3. Install dependencies
 ```bash
 npm --prefix server install
 npm --prefix frontend install
-pip install -r services/laya-engine/requirements.txt
 ```
 
 ### 4. Configure the API
 ```bash
-cp server/.env.example server/.env   # then set JWT_SECRET and review the model names
+cp server/.env.example server/.env   # then set JWT_SECRET and HF_TOKEN
 ```
 [`server/.env.example`](server/.env.example) lists every variable the code reads. The important ones:
 
@@ -161,13 +163,13 @@ cp server/.env.example server/.env   # then set JWT_SECRET and review the model 
 | `JWT_SECRET` | — | **Required** in production (the API refuses to start with the dev key) |
 | `JWT_ACCESS_TTL_MINUTES` / `JWT_REFRESH_TTL_DAYS` | `15` / `30` | Access / refresh token lifetime |
 | `CORS_ORIGINS` | `http://localhost:5174,…` | Allowed browser origins |
-| `AI_PROVIDER` | `ollama` | `ollama`, `anthropic`, `gemini` or `openai` |
-| `AI_MODEL` | `qwen2.5-coder:7b` | Live interviewer dialogue |
-| `EVALUATION_MODEL` | `qwen3:8b` | Grading, reference packs, report prose |
-| `AI_FALLBACK_PROVIDER` | — | Optional second provider |
-| `EMBEDDING_MODEL` | `nomic-embed-text` | Embeddings |
-| `LAYA_SERVICE_URL` | `http://127.0.0.1:7860` | Laya decision service |
-| `LAYA_TIMEOUT_MS` / `LAYA_TURN_TIMEOUT_MS` | `30000` / `7000` | Background / live-turn budgets |
+| `AI_PROVIDER` | `custom` | 100% Custom / Hugging Face models |
+| `CUSTOM_MODEL_URL` | `https://router.huggingface.co/hf-inference/v1` | Remote custom inference API endpoint |
+| `CUSTOM_MODEL` | `Qwen/Qwen2.5-Coder-7B-Instruct` | Live interviewer dialogue model |
+| `CUSTOM_EVALUATION_MODEL` | `Qwen/Qwen2.5-Coder-7B-Instruct` | Grading, reference packs, report prose |
+| `CUSTOM_VISION_MODEL` | `Qwen/Qwen2.5-VL-7B-Instruct` | Camera proctoring & webcam frame analysis |
+| `CUSTOM_EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | Semantic vector embeddings & scoring |
+| `LAYA_ENABLED` | `false` | Disabled (pure custom cloud models, zero local daemons) |
 
 ### 5. Prepare the database
 ```bash
@@ -183,12 +185,12 @@ One command starts everything (and is safe to run again — anything already run
 ```bash
 npm run dev            # same as: npm run start:all
 ```
-It starts Ollama, the Laya service, the API and the web app in order, waits until each one is healthy,
-checks that the AI models in `server/.env` are installed, and prints a ✔/✘ summary. Open
+It starts the AI service verification, the Laya service, the API and the web app in order, waits until each one is healthy,
+verifies that the AI models configured in `server/.env` are reachable, and prints a ✔/✘ summary. Open
 http://localhost:5174 when it says "Everything is running". Ctrl+C stops what it started.
 
 To run a single part instead: `npm run laya:start`, `npm run dev:server`, `npm run dev:web`.
-If Ollama is not running, the app refuses to start an interview and tells you how to fix it,
+If your AI model server is unreachable, the app provides clean diagnostic status,
 instead of failing on your first answer.
 `GET /api/v1/health` reports the API and database status; signed-in staff can check the models,
 embeddings and Laya at `GET /api/v1/internal/ai/health` and see per-feature latency at
@@ -201,7 +203,7 @@ embeddings and Laya at `GET /api/v1/internal/ai/health` and see per-feature late
 | Suite | Command | Result (2026-10-07) |
 |---|---|---|
 | Server unit tests (evaluation, mastery, state machine, aptitude, resume, benchmark metrics, security helpers, job deferral) | `npm run test:server` | 39 / 39 passing |
-| API integration (needs MongoDB, API, Laya and Ollama running) | `npm run test:integration` | 14 / 14 passing (~4 min) |
+| API integration (needs MongoDB, API, Laya and AI models running) | `npm run test:integration` | 14 / 14 passing (~4 min) |
 | Laya service | `npm run test:laya` | 7 / 7 passing |
 | Frontend unit tests (Vitest) | `npm run test:frontend` | 17 / 17 passing |
 | End-to-end (Playwright; app must be running) | `npm run test:e2e` | 9 / 9 passing |

@@ -54,11 +54,11 @@ function computeDurationSeconds(session) {
 function sendError(res, err, fallback) {
   if (err instanceof InterviewError) return res.status(err.status).json({ detail: err.message });
   if (err && err.code === 'AI_UNAVAILABLE') {
-    // Say what is actually wrong: a stopped Ollama server is the common case after a restart
+    // Report specific connectivity or model issues
     const down = /ECONNREFUSED|fetch failed|connect|socket hang up|ENOTFOUND/i.test(String(err.message || ''));
     return res.status(503).json({
       detail: down
-        ? 'The AI model server (Ollama) is not running. Start PrepAI with "npm run start:all" (or run "ollama serve"), then send your answer again.'
+        ? 'The AI model server is unreachable. Please verify your custom model endpoint is active and try again.'
         : 'The AI interviewer is temporarily unavailable. Please send your answer again.',
       code: down ? 'AI_SERVER_DOWN' : 'AI_UNAVAILABLE'
     });
@@ -112,9 +112,9 @@ async function aiReadiness() {
   }
   const h = last ? last.health : {};
   if (h.error) {
-    return { ok: false, detail: 'The AI model server (Ollama) is not running. Start PrepAI with "npm run start:all" (or run "ollama serve") and try again.' };
+    return { ok: false, detail: 'The AI model server is unreachable. Please ensure your custom model endpoint is running and try again.' };
   }
-  return { ok: false, detail: `The interview model "${h.activeModel || config.ai.model}" is not installed. Run "ollama pull ${h.activeModel || config.ai.model}" and try again.` };
+  return { ok: false, detail: `The interview model "${h.activeModel || config.ai.model}" is not responding. Please check your model endpoint configuration.` };
 }
 
 router.post(['/start', '/'], protect, aiLimiter, async (req, res) => {

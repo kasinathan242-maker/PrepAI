@@ -2,7 +2,7 @@
 
 ## 1. AI Provider Abstraction Layer
 
-PrepAI decouples all LLM calls from underlying vendor SDKs via an extensible, unified Object-Oriented Provider interface. The platform supports **100% local execution by default** through Ollama, while maintaining enterprise-grade cloud provider parity with zero application code changes.
+PrepAI decouples all LLM calls from underlying vendor SDKs via an extensible, unified Object-Oriented Provider interface. The platform supports **Custom Models by default** (`CustomModelProvider`) for seamless live cloud deployment, while maintaining parity with OpenAI-compatible, Google Gemini, Anthropic Claude, and local backends.
 
 ```
                            ┌──────────────────────────┐
@@ -12,16 +12,16 @@ PrepAI decouples all LLM calls from underlying vendor SDKs via an extensible, un
                  ┌───────────────────────┼────────────────────────┐
                  ▼                       ▼                        ▼
        ┌──────────────────┐    ┌──────────────────┐     ┌──────────────────┐
-       │  OllamaProvider  │    │AnthropicProvider │     │  GeminiProvider  │
-       │  (Local Default) │    │ (Claude 3.5/3.7) │     │(1.5-Pro / Flash) │
+       │CustomModelProvide│    │AnthropicProvider │     │  GeminiProvider  │
+       │  (Live Default)  │    │ (Claude 3.5/3.7) │     │(1.5-Pro / Flash) │
        └─────────┬────────┘    └─────────┬────────┘     └─────────┬────────┘
                  │                       │                        │
                  └───────────────────────┴────────────────────────┘
                                          │
                                          ▼
                                ┌───────────────────┐
-                               │OpenAICompatible   │
-                               │(Groq / vLLM / OAI)│
+                               │OpenAICompatible / │
+                               │   OllamaProvider  │
                                └───────────────────┘
 ```
 
@@ -48,10 +48,11 @@ class AIProvider {
 
 | Provider Class | Protocol | Default Model | Embedding Model | Primary Use Case |
 | :--- | :--- | :--- | :--- | :--- |
-| **`OllamaProvider`** | Native HTTP REST (`/api/chat`, `/api/embeddings`) | `qwen2.5-coder:7b` | `nomic-embed-text` | 100% Private, On-Premise, Zero-Cost Inference |
+| **`CustomModelProvider`** | Hugging Face Router REST (`/chat/completions`, `/embeddings`) | `Qwen/Qwen2.5-Coder-7B-Instruct` | `BAAI/bge-small-en-v1.5` | 100% Custom Open-Source Cloud Models (Zero Local Daemons) |
+| **`OpenAICompatible`**| Standard `/v1/chat/completions` | `gpt-4o-mini` / `llama-3.3-70b` | `text-embedding-3-small` | Groq, DeepSeek, vLLM, LM Studio, OpenAI |
 | **`AnthropicProvider`**| HTTPS REST (`/v1/messages`) | `claude-3-5-haiku-20241022` | Fallback / TF-IDF | Ultra-High Reasoning Cloud Fallback |
 | **`GeminiProvider`** | Google AI Studio REST (`/v1beta/models/...`) | `gemini-1.5-flash` | `text-embedding-004` | Cost-Effective Cloud Inference with Massive Context |
-| **`OpenAICompatible`**| Standard `/v1/chat/completions` | `gpt-4o-mini` / `llama-3.3-70b` | `text-embedding-3-small` | Groq, DeepSeek, vLLM, LM Studio, OpenAI |
+| **`OllamaProvider`** | Native HTTP REST (`/api/chat`, `/api/embeddings`) | `qwen2.5-coder:7b` | `nomic-embed-text` | Optional Local Development Workstations |
 
 ---
 

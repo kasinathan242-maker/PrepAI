@@ -35,7 +35,7 @@ Run with Node's built-in runner; model providers and Laya are mocked where neede
 
 ## 2. API integration tests (live stack)
 
-Needs MongoDB, the API (`npm run dev:server`), Laya and Ollama running. Each run registers
+Needs MongoDB, the API (`npm run dev:server`), Laya and the AI model service running. Each run registers
 `itest_*` users and deletes everything they own (sessions, turns, evaluations, reports, resumes,
 mastery, notifications, test event and question) in `after()`.
 

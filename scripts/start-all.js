@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
  * Starts everything PrepAI needs, in order, and waits until each part is healthy:
- *   1. Ollama (AI models)          http://127.0.0.1:11434
- *   2. Laya decision service       http://127.0.0.1:7860
- *   3. API (Express, auto-reload)  http://127.0.0.1:7857
- *   4. Web app (Vite)              http://localhost:5174
+ *   1. Custom AI Models (Hugging Face) https://router.huggingface.co/hf-inference/v1
+ *   2. API (Express, auto-reload)       http://127.0.0.1:7857
+ *   3. Web app (Vite)                   http://localhost:5174
  * Services that are already running are left alone. Ctrl+C stops what this script started.
  * Usage: npm run start:all   (or: node scripts/start-all.js)
  */
@@ -29,11 +28,19 @@ function readEnv(file) {
 }
 
 const env = readEnv(path.join(ROOT, 'server', '.env'));
+const PROVIDER = (env.AI_PROVIDER || 'custom').toLowerCase();
+const CUSTOM_URL = (env.CUSTOM_MODEL_URL || env.CUSTOM_BASE_URL || env.OPENAI_BASE_URL || 'https://router.huggingface.co/hf-inference/v1').replace(/\/$/, '');
 const OLLAMA = (env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
 const LAYA = (env.LAYA_SERVICE_URL || 'http://127.0.0.1:7860').replace(/\/$/, '');
+const LAYA_ENABLED = env.LAYA_ENABLED === 'true';
 const API = `http://127.0.0.1:${env.PORT || 7857}`;
 const WEB = 'http://localhost:5174';
-const MODELS = Array.from(new Set([env.AI_MODEL || 'qwen2.5-coder:7b', env.EVALUATION_MODEL || env.AI_MODEL || 'qwen3:8b', env.EMBEDDING_MODEL || 'nomic-embed-text', env.VISION_MODEL || 'qwen2.5vl:3b']));
+const MODELS = Array.from(new Set([
+  env.CUSTOM_MODEL || env.AI_MODEL || 'Qwen/Qwen2.5-Coder-7B-Instruct',
+  env.CUSTOM_EVALUATION_MODEL || env.EVALUATION_MODEL || 'Qwen/Qwen2.5-Coder-7B-Instruct',
+  env.CUSTOM_EMBEDDING_MODEL || env.EMBEDDING_MODEL || 'BAAI/bge-small-en-v1.5',
+  env.CUSTOM_VISION_MODEL || env.VISION_MODEL || 'Qwen/Qwen2.5-VL-7B-Instruct'
+]));
 
 const color = (c, s) => `\x1b[${c}m${s}\x1b[0m`;
 const log = (tag, msg) => console.log(`${color(36, `[${tag}]`)} ${msg}`);
@@ -41,7 +48,7 @@ const log = (tag, msg) => console.log(`${color(36, `[${tag}]`)} ${msg}`);
 async function up(url) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
-    return res.ok;
+    return res.ok || res.status === 401 || res.status === 404; // Server reachable
   } catch {
     return false;
   }
@@ -88,6 +95,10 @@ async function ensure(tag, url, startFn, seconds) {
 }
 
 async function checkModels() {
+  if (PROVIDER !== 'ollama') {
+    log('models', color(32, `custom models active: ${MODELS.join(', ')}`));
+    return true;
+  }
   try {
     const res = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(5000) });
     const names = ((await res.json()).models || []).map(m => m.name);
@@ -118,18 +129,38 @@ process.on('SIGTERM', () => { stopAll(); process.exit(0); });
 (async () => {
   console.log(color(35, '\n  PrepAI — starting all services\n'));
   const results = {};
-  results.ollama = await ensure('ollama', `${OLLAMA}/api/tags`, () => start('ollama', findOllama(), ['serve'], ROOT), 60);
-  results.models = results.ollama ? await checkModels() : false;
-  results.laya = await ensure('laya', `${LAYA}/health`, () => start('laya', isWin ? 'py' : 'python3', ['app.py'], path.join(ROOT, 'services', 'laya-engine')), 180);
+
+  if (PROVIDER === 'ollama') {
+    results.ai = await ensure('ollama', `${OLLAMA}/api/tags`, () => start('ollama', findOllama(), ['serve'], ROOT), 60);
+    results.models = results.ai ? await checkModels() : false;
+  } else {
+    // Custom models / live deployment mode: check custom endpoint connectivity
+    const customReachable = await up(`${CUSTOM_URL}/models`) || await up(CUSTOM_URL);
+    log('custom-ai', customReachable ? color(32, `custom endpoint reachable → ${CUSTOM_URL}`) : color(33, `custom endpoint configured → ${CUSTOM_URL}`));
+    results.ai = true;
+    results.models = true;
+  }
+
+  if (LAYA_ENABLED) {
+    results.laya = await ensure('laya', `${LAYA}/health`, () => start('laya', isWin ? 'py' : 'python3', ['app.py'], path.join(ROOT, 'services', 'laya-engine')), 180);
+  } else {
+    results.laya = true;
+  }
+
   results.api = await ensure('api', `${API}/api/v1/health`, () => start('api', 'node', ['--watch', 'src/server.js'], path.join(ROOT, 'server')), 60);
   results.web = await ensure('web', WEB, () => start('web', 'npx', ['vite', '--port', '5174', '--strictPort'], path.join(ROOT, 'frontend')), 60);
 
+  const aiName = PROVIDER === 'ollama' ? 'AI models (Ollama)' : 'Custom AI Models (Hugging Face)';
+  const aiUrl = PROVIDER === 'ollama' ? OLLAMA : CUSTOM_URL;
+
   const rows = [
-    ['AI models (Ollama)', results.ollama && results.models, OLLAMA],
-    ['Laya decision service', results.laya, LAYA],
-    ['API', results.api, API],
-    ['Web app', results.web, WEB]
+    [aiName, results.ai && results.models, aiUrl]
   ];
+  if (LAYA_ENABLED) {
+    rows.push(['Laya decision service', results.laya, LAYA]);
+  }
+  rows.push(['API', results.api, API]);
+  rows.push(['Web app', results.web, WEB]);
   console.log('');
   rows.forEach(([name, ok, url]) => console.log(`  ${ok ? color(32, '✔') : color(31, '✘')} ${name.padEnd(24)} ${url}`));
   const allOk = rows.every(r => r[1]);

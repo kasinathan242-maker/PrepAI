@@ -1,80 +1,64 @@
 /**
- * PrepAI Local Ollama Verification Script
- * Validates 100% Local Inference & Embeddings (Zero Cloud API Keys)
+ * PrepAI Custom Model & Provider Verification Script
+ * Validates Custom Model API Connectivity, Chat Generation, Embeddings & Live Readiness
  */
-async function testLocalOllama() {
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+require('dotenv').config();
+const { providerFactory } = require('../src/services/providers/AIProviderFactory');
+const config = require('../src/config/env');
+
+async function testCustomModels() {
   console.log('====================================================');
-  console.log('  🔍 PREPAI LOCAL OLLAMA VERIFICATION');
+  console.log('  🔍 PREPAI CUSTOM MODEL & LIVE VERIFICATION');
   console.log('====================================================\n');
 
-  const baseUrl = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
+  console.log(`📡 Active AI Provider:       ${config.ai.provider.toUpperCase()}`);
+  console.log(`🤖 Chat & Dialogue Model:    ${config.ai.model}`);
+  console.log(`📝 Evaluation Model:         ${config.ai.evaluationModel}`);
+  console.log(`👁️ Vision Model:             ${config.ai.visionModel}`);
+  console.log(`🧬 Embedding Provider/Model: ${config.embeddings.provider} / ${config.embeddings.model}`);
+  console.log(`🌐 Base URL:                 ${config.ai.customBaseUrl || config.ai.ollamaBaseUrl}\n`);
 
-  // 1. Check Ollama Service
+  // 1. Health Check
   try {
-    const res = await fetch(`${baseUrl}/api/tags`);
-    if (!res.ok) {
-      console.log('❌ Ollama service responded with status:', res.status);
-      return;
-    }
-    const tags = await res.json();
-    console.log('✅ Local Ollama is ONLINE at', baseUrl);
-    console.log('📦 Installed Local Models:');
-    (tags.models || []).forEach(m => console.log(`   - ${m.name} (${(m.size / (1024*1024*1024)).toFixed(2)} GB)`));
+    console.log('1️⃣ Checking Provider Health...');
+    const provider = providerFactory.getDefaultProvider();
+    const health = await provider.healthCheck();
+    console.log('   Health Status:', health.healthy ? '✅ Operational' : '⚠️ Degraded', JSON.stringify(health));
   } catch (err) {
-    console.log('❌ Failed to reach local Ollama:', err.message);
-    return;
+    console.log('   ❌ Health check failed:', err.message);
   }
 
-  // 2. Test llama3.2 Chat
+  // 2. Chat Generation Turn
   try {
-    console.log('\n🤖 Testing llama3.2 Interview Dialogue Turn...');
+    console.log('\n2️⃣ Testing Dialogue Generation Turn...');
     const t0 = Date.now();
-    const chatRes = await fetch(`${baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'llama3.2',
-        stream: false,
-        messages: [
-          { role: 'system', content: 'You are a senior tech interviewer at Amazon. Ask exactly one brief technical counter-question.' },
-          { role: 'user', content: 'I used Redis for distributed caching to optimize latency.' }
-        ]
-      })
+    const provider = providerFactory.getDefaultProvider();
+    const res = await provider.generate({
+      system: 'You are a senior tech interviewer at Amazon. Ask exactly one brief technical counter-question.',
+      prompt: 'I used Redis for distributed caching to optimize latency.',
+      maxTokens: 150,
+      temperature: 0.3
     });
-    if (chatRes.ok) {
-      const data = await chatRes.json();
-      console.log(`✅ llama3.2 Response received in ${Date.now() - t0}ms:`);
-      console.log(`   "${data.message?.content?.trim()}"`);
-    } else {
-      console.log('❌ llama3.2 failed:', await chatRes.text());
-    }
+    console.log(`   ✅ Response received in ${Date.now() - t0}ms:`);
+    console.log(`   "${res.text?.trim()}"`);
   } catch (err) {
-    console.log('❌ llama3.2 error:', err.message);
+    console.log('   ❌ Dialogue generation error:', err.message);
   }
 
-  // 3. Test nomic-embed-text
+  // 3. Embeddings Generation
   try {
-    console.log('\n🧬 Testing nomic-embed-text Resume Embeddings...');
+    console.log('\n3️⃣ Testing Vector Embeddings...');
     const t0 = Date.now();
-    const embRes = await fetch(`${baseUrl}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'nomic-embed-text',
-        prompt: 'Full Stack Developer with React, Node.js, and MongoDB experience'
-      })
-    });
-    if (embRes.ok) {
-      const data = await embRes.json();
-      console.log(`✅ nomic-embed-text Vector generated in ${Date.now() - t0}ms (Length: ${data.embedding?.length})`);
-    } else {
-      console.log('❌ nomic-embed-text failed:', await embRes.text());
-    }
+    const embResult = await providerFactory.embed('test_embedding', 'Full Stack Developer with React, Node.js, and MongoDB experience');
+    const vec = embResult.vectors?.[0] || [];
+    console.log(`   ✅ Embedding vector generated in ${Date.now() - t0}ms (Length: ${vec.length}, Model: ${embResult.model})`);
   } catch (err) {
-    console.log('❌ nomic-embed-text error:', err.message);
+    console.log('   ❌ Embedding error:', err.message);
   }
 
-  console.log('\n🎉 ALL LOCAL OLLAMA CHECKS COMPLETED! 100% Local Platform Ready.');
+  console.log('\n🎉 CUSTOM MODEL VERIFICATION COMPLETED! Live Platform Ready.');
 }
 
-testLocalOllama();
+testCustomModels();

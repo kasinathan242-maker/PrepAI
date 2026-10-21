@@ -149,8 +149,8 @@ router.post('/bullets/improve', protect, async (req, res) => {
     }
 
     let variants = null;
-    const { callOllamaLLM } = require('../services/aiService');
-    const raw = await callOllamaLLM(
+    const { callCustomLLM } = require('../services/aiService');
+    const raw = await callCustomLLM(
       `You rewrite resume bullet points for a ${role} campus placement resume. Return ONLY a JSON array of exactly 3 objects with keys "variant" (one sentence) and "focus" (one of "Quantified Impact", "Strong Action Verb", "Tech Leadership"). Keep every fact from the original. NEVER invent numbers: where a metric is needed write a placeholder like [X]% or [N] users.`,
       `Original bullet: ${bullet}`,
       { maxTokens: 300, temperature: 0.4 }

@@ -1139,7 +1139,7 @@ export const InterviewSession: React.FC = () => {
                   Staff SDE Evaluating Technical Architecture...
                 </div>
                 <p className="text-xs text-amber-600/80 dark:text-amber-300/80 mt-0.5">
-                  Local Ollama is testing your response against concurrency, failure modes, and algorithmic rigor.
+                  Custom AI model is testing your response against concurrency, failure modes, and algorithmic rigor.
                 </p>
               </div>
             </div>
@@ -1241,7 +1241,7 @@ export const InterviewSession: React.FC = () => {
         isOpen={showEndModal}
         onClose={() => setShowEndModal(false)}
         title="Conclude Interview Session?"
-        description="Are you sure you want to end this interview? Your responses will be evaluated in real-time across all 7 rubrics using local Ollama analysis."
+        description="Are you sure you want to end this interview? Your responses will be evaluated in real-time across all 7 rubrics using custom AI model analysis."
       >
         <div className="flex justify-end space-x-3 pt-4">
           <Button variant="secondary" size="sm" onClick={() => setShowEndModal(false)}>

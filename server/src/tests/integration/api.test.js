@@ -1,6 +1,6 @@
 /**
  * End-to-end API integration suite. Requires the live stack:
- *   MongoDB, API on :7857 (npm start), Laya on :7860, Ollama on :11434.
+ *   MongoDB, API on :7857 (npm start), Laya on :7860, AI models on custom endpoint.
  * Run with: npm run test:integration
  * Every account it creates uses the itest_ prefix and is removed (with all its data) afterwards.
  */

@@ -3,6 +3,7 @@ const InterviewFrame = require('../models/InterviewFrame');
 const { renderPrompt } = require('../prompts');
 const { parseModelJson } = require('./jsonOutput');
 const { recordExecution } = require('./observability');
+const { providerFactory } = require('./providers/AIProviderFactory');
 
 const ALLOWED = {
   facing: ['camera', 'screen', 'away', 'unclear'],
@@ -42,33 +43,73 @@ function normaliseFrameAnalysis(raw) {
 async function analyseImage(base64, { model = config.ai.visionModel } = {}) {
   const prompt = renderPrompt('vision_frame');
   let lastError = null;
+  const isOllama = config.ai.provider === 'ollama';
+
   for (let attempt = 0; attempt < 2; attempt++) {
     const started = Date.now();
     try {
-      const res = await fetch(`${config.ai.ollamaBaseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      let rawJsonContent = null;
+      let usedProvider = config.ai.provider;
+
+      if (!isOllama) {
+        // Use custom model provider (or OpenAI-compatible vision endpoint)
+        const customProvider = providerFactory.getProvider('custom');
+        const visionResult = await customProvider.analyseVision(base64, {
+          prompt: prompt.text,
           model,
-          stream: false,
-          format: 'json',
-          options: { temperature: 0.1, num_predict: 400 },
-          messages: [
-            { role: 'system', content: prompt.text },
-            { role: 'user', content: 'Analyse this interview webcam frame.', images: [base64] }
-          ]
-        }),
-        signal: AbortSignal.timeout(90000)
+          maxTokens: 400
+        });
+        rawJsonContent = visionResult.content;
+        usedProvider = 'custom';
+      } else {
+        // Ollama local endpoint
+        const res = await fetch(`${config.ai.ollamaBaseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            stream: false,
+            format: 'json',
+            options: { temperature: 0.1, num_predict: 400 },
+            messages: [
+              { role: 'system', content: prompt.text },
+              { role: 'user', content: 'Analyse this interview webcam frame.', images: [base64] }
+            ]
+          }),
+          signal: AbortSignal.timeout(90000)
+        });
+        if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
+        const body = await res.json();
+        rawJsonContent = body.message && body.message.content;
+        usedProvider = 'ollama';
+      }
+
+      const analysis = normaliseFrameAnalysis(parseModelJson(rawJsonContent));
+      recordExecution({
+        feature: 'vision_frame',
+        kind: 'generation',
+        provider: usedProvider,
+        model,
+        latencyMs: Date.now() - started,
+        success: Boolean(analysis),
+        errorType: analysis ? null : 'invalid_output',
+        retries: attempt,
+        structuredOutputValid: Boolean(analysis)
       });
-      if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${(await res.text()).slice(0, 160)}`);
-      const body = await res.json();
-      const analysis = normaliseFrameAnalysis(parseModelJson(body.message && body.message.content));
-      recordExecution({ feature: 'vision_frame', kind: 'generation', provider: 'ollama', model, latencyMs: Date.now() - started, success: Boolean(analysis), errorType: analysis ? null : 'invalid_output', retries: attempt, structuredOutputValid: Boolean(analysis) });
       if (analysis) return { analysis, model, promptVersion: prompt.version, latencyMs: Date.now() - started };
       lastError = new Error('Vision model returned output that does not match the schema');
     } catch (err) {
       lastError = err;
-      recordExecution({ feature: 'vision_frame', kind: 'generation', provider: 'ollama', model, latencyMs: Date.now() - started, success: false, errorType: 'provider_error', retries: attempt });
+      recordExecution({
+        feature: 'vision_frame',
+        kind: 'generation',
+        provider: isOllama ? 'ollama' : 'custom',
+        model,
+        latencyMs: Date.now() - started,
+        success: false,
+        errorType: 'provider_error',
+        retries: attempt
+      });
     }
   }
   throw lastError;

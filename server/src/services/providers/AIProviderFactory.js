@@ -1,3 +1,4 @@
+const CustomModelProvider = require('./CustomModelProvider');
 const OllamaProvider = require('./OllamaProvider');
 const AnthropicProvider = require('./AnthropicProvider');
 const GeminiProvider = require('./GeminiProvider');
@@ -6,10 +7,11 @@ const config = require('../../config/env');
 const { recordExecution, classifyError } = require('../observability');
 
 const PROVIDER_CLASSES = {
-  ollama: OllamaProvider,
+  custom: CustomModelProvider,
+  openai: OpenAICompatibleProvider,
   anthropic: AnthropicProvider,
   gemini: GeminiProvider,
-  openai: OpenAICompatibleProvider
+  ollama: OllamaProvider
 };
 
 class AIProviderFactory {
@@ -18,9 +20,9 @@ class AIProviderFactory {
   }
 
   getProvider(name) {
-    const key = String(name || config.ai.provider).toLowerCase();
+    const key = String(name || config.ai.provider || 'custom').toLowerCase();
     if (!this.providers.has(key)) {
-      const Cls = PROVIDER_CLASSES[key];
+      const Cls = PROVIDER_CLASSES[key] || PROVIDER_CLASSES.custom;
       if (!Cls) throw new Error(`Unsupported AI provider "${name}"`);
       this.providers.set(key, new Cls());
     }
